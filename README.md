@@ -4,6 +4,77 @@
 
 Impersonate **Heather Cox Richardson** (political historian) and **Nate B Jones** (AI strategist) using their actual YouTube transcripts as grounding knowledge — all running locally, no cloud dependencies.
 
+## How to Use
+
+```bash
+# 1. Start everything
+./scripts/setup.sh up
+
+# 2a. Ingest transcripts — test mode (5 most recent videos per channel)
+./scripts/setup.sh ingest-test
+
+# 2b. Ingest transcripts — full (all videos since Aug 2025 cutoff)
+./scripts/setup.sh ingest
+
+# 3. Query via API
+curl -X POST http://localhost:28000/query \
+  -H "Content-Type: application/json" \
+  -d '{"question": "What is happening with AI?", "persona": "nate_b_jones"}'
+```
+
+## Flow diagram
+
+```mermaid
+graph TD
+    subgraph "1. Download"
+        YT["YouTube Channel<br/>@NateBJones<br/>@heathercoxrichardson"]
+        YTDLP["yt-dlp<br/>--dateafter 20250801<br/>--write-subs --write-auto-subs"]
+        VTT[".vtt subtitle files<br/>data/transcripts/{persona}/"]
+        YT --> YTDLP --> VTT
+    end
+
+    subgraph "2. Process"
+        PARSE["VTT Parser<br/>Strip timestamps, HTML,<br/>deduplicate lines"]
+        CLEAN["Clean Text<br/>(one long string)"]
+        CHUNK["Chunker<br/>1000 chars, 200 overlap<br/>sentence-boundary aware"]
+        CHUNKS["Text Chunks<br/>(list of ~1000-char pieces)"]
+        VTT --> PARSE --> CLEAN --> CHUNK --> CHUNKS
+    end
+
+    subgraph "3. Embed (× 2 models)"
+        OLLAMA["Ollama Container<br/>:21434"]
+        NOMIC["nomic-embed-text<br/>→ 768-dim vectors"]
+        MXBAI["mxbai-embed-large<br/>→ 1024-dim vectors"]
+        CHUNKS --> OLLAMA
+        OLLAMA --> NOMIC
+        OLLAMA --> MXBAI
+    end
+
+    subgraph "4. Store (× 2 backends)"
+        PG["PostgreSQL + pgvector<br/>:25432<br/>documents_nomic (768d)<br/>documents_mxbai (1024d)"]
+        LANCE["LanceDB (embedded)<br/>Lance columnar files<br/>data/vectordb/lancedb/"]
+        NOMIC --> PG
+        NOMIC --> LANCE
+        MXBAI --> PG
+        MXBAI --> LANCE
+    end
+
+    subgraph "5. Query (at runtime)"
+        Q["User Question"]
+        EMB_Q["Embed question<br/>(same model)"]
+        SEARCH["Cosine similarity<br/>search top-K"]
+        PROMPT["Build persona prompt<br/>+ retrieved excerpts"]
+        Q --> EMB_Q --> SEARCH --> PROMPT
+        PG -.-> SEARCH
+        LANCE -.-> SEARCH
+    end
+
+    style OLLAMA fill:#2d5a27,color:#fff
+    style PG fill:#336791,color:#fff
+    style LANCE fill:#8b4513,color:#fff
+```
+
+
 ## What Was Built
 
 A fully local, Docker-based **Retrieval-Augmented Generation (RAG)** system for AI-moderated debates, impersonating Heather Cox Richardson and Nate B Jones using their YouTube transcripts as grounding knowledge.
@@ -49,24 +120,6 @@ A fully local, Docker-based **Retrieval-Augmented Generation (RAG)** system for 
 4. **Claude Opus 4 training cutoff: August 2025** — transcripts after this date are novel to the model
 5. **Python 3.12 on Debian bookworm** (not Alpine) for LanceDB binary compatibility
 6. **Non-standard ports** (21434, 25432, 28000) to avoid conflicts with native Ollama/Postgres
-
-## How to Use
-
-```bash
-# 1. Start everything
-./scripts/setup.sh up
-
-# 2a. Ingest transcripts — test mode (5 most recent videos per channel)
-./scripts/setup.sh ingest-test
-
-# 2b. Ingest transcripts — full (all videos since Aug 2025 cutoff)
-./scripts/setup.sh ingest
-
-# 3. Query via API
-curl -X POST http://localhost:28000/query \
-  -H "Content-Type: application/json" \
-  -d '{"question": "What is happening with AI?", "persona": "nate_b_jones"}'
-```
 
 ## Docker Status (Verified ✅)
 
