@@ -76,11 +76,11 @@ cmd_logs() {
 }
 
 cmd_health() {
-    curl -s http://localhost:8000/health | python3 -m json.tool
+    curl -s http://localhost:28000/health | python3 -m json.tool
 }
 
 cmd_stats() {
-    curl -s http://localhost:8000/stats | python3 -m json.tool
+    curl -s http://localhost:28000/stats | python3 -m json.tool
 }
 
 cmd_shell() {

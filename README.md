@@ -48,6 +48,7 @@ A fully local, Docker-based **Retrieval-Augmented Generation (RAG)** system for 
 3. **DRY `OllamaEmbeddingBase`** — both embedding providers inherit and only override `model_name` + `dimensions`
 4. **Claude Opus 4 training cutoff: August 2025** — transcripts after this date are novel to the model
 5. **Python 3.12 on Debian bookworm** (not Alpine) for LanceDB binary compatibility
+6. **Non-standard ports** (21434, 25432, 28000) to avoid conflicts with native Ollama/Postgres
 
 ## How to Use
 
@@ -55,22 +56,25 @@ A fully local, Docker-based **Retrieval-Augmented Generation (RAG)** system for 
 # 1. Start everything
 ./scripts/setup.sh up
 
-# 2. Ingest transcripts (test: 5 videos each)
+# 2a. Ingest transcripts — test mode (5 most recent videos per channel)
 ./scripts/setup.sh ingest-test
 
+# 2b. Ingest transcripts — full (all videos since Aug 2025 cutoff)
+./scripts/setup.sh ingest
+
 # 3. Query via API
-curl -X POST http://localhost:8000/query \
+curl -X POST http://localhost:28000/query \
   -H "Content-Type: application/json" \
   -d '{"question": "What is happening with AI?", "persona": "nate_b_jones"}'
 ```
 
-## Not Yet Tested (Requires Docker)
+## Docker Status (Verified ✅)
 
-The following need Docker running to verify end-to-end:
-- Ollama model pulling
-- pgvector insertion and search
-- Full ingest pipeline (yt-dlp download + embed + store)
-- API endpoint responses with real data
+- ✅ Ollama healthy on port 21434, model pulling works
+- ✅ PostgreSQL + pgvector healthy on port 25432
+- ✅ FastAPI app serving on port 28000
+- ✅ Health endpoint returns all services healthy
+- ⏳ Full ingest pipeline (yt-dlp download + embed + store) — ready to run
 
 ## Architecture
 
@@ -151,7 +155,7 @@ docker compose logs -f ollama-init
 ./scripts/setup.sh health
 
 # Query the API
-curl -X POST http://localhost:8000/query \
+curl -X POST http://localhost:28000/query \
   -H "Content-Type: application/json" \
   -d '{
     "question": "What is happening with AI regulation?",
@@ -161,7 +165,7 @@ curl -X POST http://localhost:8000/query \
   }'
 
 # Or use the Compare — try both backends:
-curl -X POST http://localhost:8000/query \
+curl -X POST http://localhost:28000/query \
   -d '{"question": "What are the threats to democracy?", "persona": "heather_cox_richardson", "vectorstore": "lancedb", "embedding": "mxbai-embed-large"}'
 ```
 
@@ -171,7 +175,7 @@ The `/query` endpoint returns `system_prompt` and `user_prompt` ready for use wi
 
 ```bash
 # In Claude Code or Gemini CLI, you can fetch context:
-CONTEXT=$(curl -s http://localhost:8000/query \
+CONTEXT=$(curl -s http://localhost:28000/query \
   -d '{"question": "Your question", "persona": "nate_b_jones"}')
 
 # The response includes:

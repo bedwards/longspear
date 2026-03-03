@@ -3,15 +3,15 @@ services:
     image: ollama/ollama:latest
     container_name: longspear-ollama
     ports:
-      - "11434:11434"
+      - "21434:11434"
     volumes:
       - ollama_data:/root/.ollama
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:11434/api/tags || exit 1"]
+      test: ["CMD", "ollama", "list"]
       interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 30s
+      timeout: 10s
+      retries: 12
+      start_period: 60s
     restart: unless-stopped
 
   ollama-init:
@@ -40,7 +40,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-longspear_dev}
       POSTGRES_DB: ${POSTGRES_DB:-longspear}
     ports:
-      - "5433:5432"
+      - "25432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./scripts/init_db.sql:/docker-entrypoint-initdb.d/01-init.sql
@@ -62,7 +62,7 @@ services:
       ollama:
         condition: service_healthy
     ports:
-      - "${APP_PORT:-8000}:8000"
+      - "${APP_PORT:-28000}:8000"
     volumes:
       - ./data:/app/data
       - ./config:/app/config
