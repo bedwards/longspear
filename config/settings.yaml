@@ -1,0 +1,51 @@
+# ── Data Cutoff ────────────────────────────────────────────
+# Claude Opus 4 (claude-opus-4-20250514)
+# Training data cutoff: August 2025
+# Reliable knowledge cutoff: May 2025
+# We download transcripts AFTER this date
+data_cutoff_date: "2025-08-01"
+
+# ── YouTube Channels ──────────────────────────────────────
+channels:
+  heather_cox_richardson:
+    url: "https://www.youtube.com/@heathercoxrichardson"
+    name: "Heather Cox Richardson"
+    description: "Political historian using facts and history to analyze contemporary American politics"
+    slug: "heather_cox_richardson"
+  nate_b_jones:
+    url: "https://www.youtube.com/@NateBJones"
+    name: "Nate B Jones"
+    description: "AI strategist and product management veteran providing actionable AI insights"
+    slug: "nate_b_jones"
+
+# ── Embedding Models ──────────────────────────────────────
+embedding:
+  default: "nomic-embed-text"
+  models:
+    nomic-embed-text:
+      dimensions: 768
+      description: "Fast, efficient general-purpose embedding"
+    mxbai-embed-large:
+      dimensions: 1024
+      description: "High quality, outperforms OpenAI text-embedding-3-large"
+
+# ── Vector Stores ─────────────────────────────────────────
+vectorstore:
+  default: "pgvector"
+  backends:
+    pgvector:
+      description: "PostgreSQL + pgvector — production-grade, SQL + vectors"
+    lancedb:
+      path: "./data/vectordb/lancedb"
+      description: "LanceDB — embedded, zero-config, Lance columnar format"
+
+# ── Chunking ──────────────────────────────────────────────
+chunking:
+  chunk_size: 1000       # characters per chunk
+  chunk_overlap: 200     # overlap between consecutive chunks
+  min_chunk_size: 100    # discard chunks smaller than this
+
+# ── Retrieval ─────────────────────────────────────────────
+retrieval:
+  top_k: 10              # number of chunks to retrieve
+  score_threshold: 0.3   # minimum similarity score (cosine)

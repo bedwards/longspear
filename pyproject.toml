@@ -1,0 +1,9 @@
+[project]
+name = "longspear"
+version = "0.1.0"
+description = "Local Docker RAG system for AI-moderated debates using YouTube transcripts"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
