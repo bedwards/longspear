@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Longspear — AI-Moderated Debates</title>
+    <meta name="description" content="Local RAG-powered debates between AI personas grounded in real YouTube transcripts">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="header-inner">
+            <div class="logo">
+                <span class="logo-icon">⚔️</span>
+                <h1>Longspear</h1>
+            </div>
+            <nav class="nav">
+                <button class="nav-btn active" data-mode="debate" id="nav-debate">Debate</button>
+                <button class="nav-btn" data-mode="chat" id="nav-chat">Chat</button>
+                <button class="nav-btn" data-mode="monitor" id="nav-monitor">Monitor</button>
+            </nav>
+            <div class="status-indicator" id="status-dot">
+                <span class="dot"></span>
+                <span class="status-text">Connecting...</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Debate Mode -->
+    <main class="container" id="debate-view">
+        <div class="debate-header">
+            <h2 class="section-title">Moderated Debate</h2>
+            <p class="section-subtitle">Two personas discuss your question, grounded in their real YouTube transcripts</p>
+        </div>
+
+        <div class="personas-row">
+            <div class="persona-card" id="persona-a-card">
+                <div class="persona-avatar persona-a-gradient">HCR</div>
+                <div class="persona-info">
+                    <h3>Heather Cox Richardson</h3>
+                    <p class="persona-tagline">Political Historian · Boston College</p>
+                </div>
+            </div>
+            <div class="vs-badge">VS</div>
+            <div class="persona-card" id="persona-b-card">
+                <div class="persona-avatar persona-b-gradient">NBJ</div>
+                <div class="persona-info">
+                    <h3>Nate B Jones</h3>
+                    <p class="persona-tagline">Political Commentator</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="input-area">
+            <div class="input-wrapper">
+                <textarea id="debate-question" placeholder="Ask a question for both personas to debate..." rows="2"></textarea>
+                <button class="send-btn" id="debate-send" title="Start debate">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <div class="conversation-area" id="debate-messages">
+            <!-- Messages appear here -->
+        </div>
+    </main>
+
+    <!-- Chat Mode -->
+    <main class="container hidden" id="chat-view">
+        <div class="chat-header">
+            <h2 class="section-title">One-on-One Chat</h2>
+            <div class="persona-select-row">
+                <label>Chat with:</label>
+                <select id="chat-persona">
+                    <option value="heather_cox_richardson">Heather Cox Richardson</option>
+                    <option value="nate_b_jones">Nate B Jones</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="input-area">
+            <div class="input-wrapper">
+                <textarea id="chat-question" placeholder="Ask a question..." rows="2"></textarea>
+                <button class="send-btn" id="chat-send" title="Send">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <div class="conversation-area" id="chat-messages">
+            <!-- Messages appear here -->
+        </div>
+    </main>
+
+    <!-- Monitor Mode -->
+    <main class="container hidden" id="monitor-view">
+        <div class="monitor-header">
+            <h2 class="section-title">System Monitor</h2>
+            <button class="refresh-btn" id="monitor-refresh">Refresh</button>
+        </div>
+
+        <div class="monitor-grid">
+            <div class="monitor-card">
+                <h3>Health</h3>
+                <div id="monitor-health" class="monitor-content">Loading...</div>
+            </div>
+            <div class="monitor-card">
+                <h3>Document Stats</h3>
+                <div id="monitor-stats" class="monitor-content">Loading...</div>
+            </div>
+            <div class="monitor-card">
+                <h3>Personas</h3>
+                <div id="monitor-personas" class="monitor-content">Loading...</div>
+            </div>
+        </div>
+    </main>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

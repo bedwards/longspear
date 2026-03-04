@@ -75,7 +75,7 @@ class LanceDBStore(VectorStore):
             return 0
 
         # Create or append to table
-        if table_name in db.table_names():
+        if table_name in db.list_tables():
             table = db.open_table(table_name)
             table.add(records)
         else:
@@ -98,7 +98,7 @@ class LanceDBStore(VectorStore):
         db = self._get_db()
         table_name = _table_name(embedding_model)
 
-        if table_name not in db.table_names():
+        if table_name not in db.list_tables():
             logger.warning("Table '%s' does not exist", table_name)
             return []
 
@@ -136,7 +136,7 @@ class LanceDBStore(VectorStore):
         db = self._get_db()
         table_name = _table_name(embedding_model)
 
-        if table_name not in db.table_names():
+        if table_name not in db.list_tables():
             return 0
 
         table = db.open_table(table_name)
@@ -153,7 +153,7 @@ class LanceDBStore(VectorStore):
         db = self._get_db()
         table_name = _table_name(embedding_model)
 
-        if table_name not in db.table_names():
+        if table_name not in db.list_tables():
             return 0
 
         table = db.open_table(table_name)

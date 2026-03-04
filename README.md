@@ -84,7 +84,7 @@ A fully local, Docker-based **Retrieval-Augmented Generation (RAG)** system for 
 ### Infrastructure
 | File | Purpose |
 |------|---------|
-| [docker-compose.yml](file:///Users/bedwards/vibe/longspear/docker-compose.yml) | Ollama + PostgreSQL+pgvector + Python app |
+| [docker-compose.yml](file:///Users/bedwards/vibe/longspear/docker-compose.yml) | PostgreSQL+pgvector + Python app |
 | [Dockerfile](file:///Users/bedwards/vibe/longspear/Dockerfile) | Python 3.12-slim-bookworm app image |
 | [scripts/init_db.sql](file:///Users/bedwards/vibe/longspear/scripts/init_db.sql) | pgvector extension + dual-dimension tables + HNSW indexes |
 | [scripts/setup.sh](file:///Users/bedwards/vibe/longspear/scripts/setup.sh) | Convenience wrapper for all Docker operations |
@@ -123,35 +123,41 @@ A fully local, Docker-based **Retrieval-Augmented Generation (RAG)** system for 
 
 ## Docker Status (Verified ✅)
 
-- ✅ Ollama healthy on port 21434, model pulling works
-- ✅ PostgreSQL + pgvector healthy on port 25432
-- ✅ FastAPI app serving on port 28000
+- ✅ Native Ollama with Metal GPU on port 11434 (nomic-embed-text + mxbai-embed-large pulled)
+- ✅ PostgreSQL + pgvector healthy on port 25432 (Docker)
+- ✅ FastAPI app serving on port 28000 (Docker)
 - ✅ Health endpoint returns all services healthy
-- ⏳ Full ingest pipeline (yt-dlp download + embed + store) — ready to run
+- ✅ 274 HCR transcripts downloaded (8,179 chunks)
+- ⏳ Full ingest pipeline — ready to run
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                  Docker Compose                      │
-│                                                      │
-│  ┌──────────┐  ┌─────────────────┐  ┌────────────┐ │
-│  │  Ollama   │  │   PostgreSQL    │  │  Python App │ │
-│  │          │  │   + pgvector    │  │            │ │
-│  │ nomic-   │  │                 │  │ FastAPI    │ │
-│  │ embed-   │  │  Vector Store A │  │ LanceDB    │ │
-│  │ text     │  │                 │  │ (embedded) │ │
-│  │          │  │                 │  │            │ │
-│  │ mxbai-   │  └─────────────────┘  │ Vector     │ │
-│  │ embed-   │                       │ Store B    │ │
-│  │ large    │                       │            │ │
-│  └──────────┘                       └────────────┘ │
-└─────────────────────────────────────────────────────┘
-         ▲                                    ▲
-         │                                    │
-    Embedding                            Agent Query
-    Generation                          (Claude Code,
-                                        Gemini CLI)
+                  ┌─────────────────────────────────┐
+                  │  Native Ollama (Metal GPU)   │
+                  │  nomic-embed-text            │
+                  │  mxbai-embed-large           │
+                  │  :11434                      │
+                  └───────────────┬─────────────────┘
+                                │
+            host.docker.internal:11434
+                                │
+┌───────────────────────────────────────────────────┐
+│              Docker Compose                      │
+│                                                   │
+│  ┌──────────────────┐  ┌───────────────────────┐  │
+│  │   PostgreSQL     │  │       Python App        │  │
+│  │   + pgvector     │  │                         │  │
+│  │                  │  │  FastAPI  │  LanceDB    │  │
+│  │  Vector Store A  │  │  :28000  │  (embedded) │  │
+│  │  :25432          │  │          │  Store B    │  │
+│  └──────────────────┘  └───────────────────────┘  │
+└───────────────────────────────────────────────────┘
+                                        ▲
+                                        │
+                                  Agent Query
+                                 (Claude Code,
+                                  Gemini CLI)
 ```
 
 ### Dual Everything — Compare Side by Side
@@ -167,7 +173,7 @@ A fully local, Docker-based **Retrieval-Augmented Generation (RAG)** system for 
 ### Prerequisites
 
 - [Docker](https://docs.docker.com/get-docker/) and Docker Compose
-- ~2GB disk for Ollama models
+- [Ollama](https://ollama.com) installed natively (for Metal GPU)
 - ~1GB disk for PostgreSQL data
 
 ### 1. Setup
@@ -184,11 +190,11 @@ cat .env
 ### 2. Start Services
 
 ```bash
-./scripts/setup.sh up
+# Ensure native Ollama is running with models
+ollama pull nomic-embed-text
+ollama pull mxbai-embed-large
 
-# First run: Ollama will pull embedding models (takes a few minutes)
-# Monitor with:
-docker compose logs -f ollama-init
+./scripts/setup.sh up
 ```
 
 ### 3. Ingest Transcripts

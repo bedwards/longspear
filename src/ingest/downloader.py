@@ -118,7 +118,14 @@ class TranscriptDownloader:
             "-o", str(self._output_dir / "%(upload_date)s_%(id)s.%(ext)s"),
             # Write metadata
             "--write-info-json",
-            # No warnings
+            # Rate-limit avoidance
+            "--sleep-requests", "1.5",
+            "--sleep-interval", "1",
+            "--max-sleep-interval", "5",
+            "--retries", "10",
+            "--extractor-retries", "5",
+            "--concurrent-fragments", "1",
+            # No warnings, no overwrites
             "--no-warnings",
             "--no-overwrites",
         ]
@@ -133,11 +140,31 @@ class TranscriptDownloader:
         )
 
         try:
-            result = subprocess.run(
-                cmd, capture_output=True, text=True, timeout=3600
+            process = subprocess.Popen(
+                cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
             )
-            if result.returncode != 0:
-                logger.warning("yt-dlp stderr: %s", result.stderr[:500])
+
+            # Stream stderr in real-time (yt-dlp writes progress there)
+            vtt_count_prev = 0
+            while True:
+                line = process.stderr.readline()
+                if not line and process.poll() is not None:
+                    break
+                if line:
+                    line = line.strip()
+                    if "ERROR" in line:
+                        logger.warning("yt-dlp: %s", line[:200])
+                    elif "Downloading" in line or "Writing" in line:
+                        logger.info("yt-dlp: %s", line[:200])
+
+                # Periodic VTT count
+                vtt_count = len(list(self._output_dir.glob("*.vtt")))
+                if vtt_count != vtt_count_prev:
+                    logger.info("Transcripts downloaded so far: %d", vtt_count)
+                    vtt_count_prev = vtt_count
+
+            if process.returncode != 0:
+                logger.warning("yt-dlp exited with code %d", process.returncode)
         except subprocess.TimeoutExpired:
             logger.error("Timed out downloading transcripts")
             return []

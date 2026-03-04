@@ -1,37 +1,4 @@
 services:
-  ollama:
-    image: ollama/ollama:latest
-    container_name: longspear-ollama
-    ports:
-      - "21434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    healthcheck:
-      test: ["CMD", "ollama", "list"]
-      interval: 10s
-      timeout: 10s
-      retries: 12
-      start_period: 60s
-    restart: unless-stopped
-
-  ollama-init:
-    image: ollama/ollama:latest
-    container_name: longspear-ollama-init
-    depends_on:
-      ollama:
-        condition: service_healthy
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - |
-        echo "Pulling nomic-embed-text..."
-        ollama pull nomic-embed-text
-        echo "Pulling mxbai-embed-large..."
-        ollama pull mxbai-embed-large
-        echo "All models pulled."
-    environment:
-      OLLAMA_HOST: http://ollama:11434
-    restart: "no"
-
   postgres:
     image: pgvector/pgvector:pg17
     container_name: longspear-postgres
@@ -59,8 +26,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      ollama:
-        condition: service_healthy
     ports:
       - "${APP_PORT:-28000}:8000"
     volumes:
@@ -73,10 +38,10 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-longspear}
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
-      OLLAMA_HOST: http://ollama:11434
+      # Use native Ollama on the host (Metal GPU)
+      OLLAMA_HOST: http://host.docker.internal:11434
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     restart: unless-stopped
 
 volumes:
   pgdata:
-  ollama_data:

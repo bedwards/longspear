@@ -6,7 +6,7 @@ import logging
 from typing import Any
 
 import psycopg
-from pgvector.psycopg import register_vector
+from pgvector.psycopg import register_vector_async
 
 from .base import Document, SearchResult, VectorStore
 
@@ -44,7 +44,7 @@ class PgVectorStore(VectorStore):
             self._conn = await psycopg.AsyncConnection.connect(
                 self._dsn, autocommit=True
             )
-            await register_vector(self._conn)
+            await register_vector_async(self._conn)
         return self._conn
 
     async def initialize(self) -> None:
@@ -111,28 +111,27 @@ class PgVectorStore(VectorStore):
         table = self._table(embedding_model)
         conn = await self._get_conn()
 
-        where_clause = ""
-        params: list[Any] = [query_embedding, top_k]
+        # Convert to string format for pgvector
+        vec_str = "[" + ",".join(str(x) for x in query_embedding) + "]"
 
+        where_clause = ""
         if persona:
             where_clause = "WHERE persona = %s"
-            params = [query_embedding, persona, top_k]
 
         query = f"""
             SELECT content, persona, source_file, video_title,
                    video_date, video_url, chunk_index,
-                   1 - (embedding <=> %s) AS similarity
+                   1 - (embedding <=> %s::vector) AS similarity
             FROM {table}
             {where_clause}
-            ORDER BY embedding <=> %s
+            ORDER BY embedding <=> %s::vector
             LIMIT %s
         """
 
-        # Adjust params for the double reference to embedding
         if persona:
-            params = [query_embedding, persona, query_embedding, top_k]
+            params: list[Any] = [vec_str, persona, vec_str, top_k]
         else:
-            params = [query_embedding, query_embedding, top_k]
+            params = [vec_str, vec_str, top_k]
 
         results: list[SearchResult] = []
         async with conn.cursor() as cur:
