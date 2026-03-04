@@ -115,6 +115,10 @@ class DebateRequest(BaseModel):
     vectorstore: str | None = Field(None)
     embedding: str | None = Field(None)
     top_k: int | None = Field(None)
+    rounds_mean: float = Field(3.0, description="Mean number of exchange rounds")
+    rounds_std: float = Field(1.0, description="Std dev for rounds")
+    length_mean: int = Field(200, description="Mean max_tokens per response")
+    length_std: int = Field(80, description="Std dev for max_tokens")
 
 
 # ── Endpoints ─────────────────────────────────────────────
@@ -258,7 +262,13 @@ async def chat(request: ChatRequest):
 
 @app.post("/debate")
 async def debate(request: DebateRequest):
-    """Run a moderated debate between two personas. Streams via SSE."""
+    """Run a multi-round moderated debate. Streams via SSE.
+
+    Rounds and response lengths are drawn from normal distributions
+    for natural, varied conversation flow.
+    """
+    import random
+
     # Validate both personas
     for p in [request.persona_a, request.persona_b]:
         try:
@@ -271,40 +281,71 @@ async def debate(request: DebateRequest):
 
     engine = ConversationEngine()
 
+    # Draw number of rounds from normal distribution (clamped)
+    num_rounds = max(2, min(5, round(
+        random.gauss(request.rounds_mean, request.rounds_std)
+    )))
+
     async def debate_stream():
         try:
-            # Persona A goes first
-            yield f"data: {json.dumps({'type': 'turn_start', 'persona': request.persona_a})}\n\n"
+            # Send debate metadata
+            yield f"data: {json.dumps({'type': 'debate_start', 'rounds': num_rounds, 'persona_a': request.persona_a, 'persona_b': request.persona_b})}\n\n"
 
-            response_a_parts: list[str] = []
-            async for token in engine.chat_stream(
-                question=request.question,
-                persona_slug=request.persona_a,
-                embedding_model=request.embedding,
-                vectorstore_backend=request.vectorstore,
-                top_k=request.top_k,
-            ):
-                response_a_parts.append(token)
-                yield f"data: {json.dumps({'type': 'token', 'persona': request.persona_a, 'content': token})}\n\n"
+            exchange_history: list[dict[str, str]] = []
+            personas = [request.persona_a, request.persona_b]
 
-            response_a = "".join(response_a_parts)
-            yield f"data: {json.dumps({'type': 'turn_end', 'persona': request.persona_a})}\n\n"
+            for round_idx in range(num_rounds):
+                for turn_idx, persona in enumerate(personas):
+                    # Draw max_tokens from normal distribution (clamped)
+                    max_tokens = max(60, min(500, round(
+                        random.gauss(request.length_mean, request.length_std)
+                    )))
 
-            # Persona B responds, given A's response
-            yield f"data: {json.dumps({'type': 'turn_start', 'persona': request.persona_b})}\n\n"
+                    # Build the "other response" from the last turn
+                    other_response = None
+                    if exchange_history:
+                        last = exchange_history[-1]
+                        other_response = last["content"]
 
-            async for token in engine.chat_stream(
-                question=request.question,
-                persona_slug=request.persona_b,
-                embedding_model=request.embedding,
-                vectorstore_backend=request.vectorstore,
-                top_k=request.top_k,
-                other_response=response_a,
-            ):
-                yield f"data: {json.dumps({'type': 'token', 'persona': request.persona_b, 'content': token})}\n\n"
+                    yield f"data: {json.dumps({'type': 'turn_start', 'persona': persona, 'round': round_idx + 1, 'max_tokens': max_tokens})}\n\n"
 
-            yield f"data: {json.dumps({'type': 'turn_end', 'persona': request.persona_b})}\n\n"
-            yield f"data: {json.dumps({'type': 'done'})}\n\n"
+                    # Build a richer prompt that includes conversation context
+                    context_prompt = request.question
+                    if exchange_history:
+                        context_prompt += "\n\n[Conversation so far:]\n"
+                        for entry in exchange_history[-4:]:  # Last 4 turns
+                            context_prompt += f"\n{entry['persona_name']}: {entry['content']}\n"
+                        context_prompt += f"\n[Continue the conversation. Respond naturally in roughly {max_tokens // 4} words — be concise when the point is simple, elaborate when it needs depth.]"
+
+                    response_parts: list[str] = []
+                    token_count = 0
+                    async for token in engine.chat_stream(
+                        question=context_prompt,
+                        persona_slug=persona,
+                        embedding_model=request.embedding,
+                        vectorstore_backend=request.vectorstore,
+                        top_k=request.top_k,
+                        other_response=other_response,
+                    ):
+                        response_parts.append(token)
+                        token_count += 1
+                        yield f"data: {json.dumps({'type': 'token', 'persona': persona, 'content': token})}\n\n"
+
+                        # Soft stop near max_tokens (finish current sentence)
+                        if token_count >= max_tokens and token.rstrip().endswith(('.', '!', '?', '"')):
+                            break
+
+                    response_text = "".join(response_parts)
+                    persona_cfg = load_persona(persona)
+                    exchange_history.append({
+                        "persona": persona,
+                        "persona_name": persona_cfg.name,
+                        "content": response_text,
+                    })
+
+                    yield f"data: {json.dumps({'type': 'turn_end', 'persona': persona, 'round': round_idx + 1})}\n\n"
+
+            yield f"data: {json.dumps({'type': 'done', 'total_rounds': num_rounds})}\n\n"
 
         except Exception as e:
             logger.exception("Debate stream error")

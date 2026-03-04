@@ -160,7 +160,20 @@ async function startDebate() {
                 if (!line.startsWith('data: ')) continue;
                 const data = JSON.parse(line.slice(6));
 
-                if (data.type === 'turn_start') {
+                if (data.type === 'debate_start') {
+                    const meta = document.createElement('div');
+                    meta.className = 'debate-meta';
+                    meta.innerHTML = `<span class="debate-rounds">${data.rounds} rounds</span>`;
+                    container.appendChild(meta);
+                } else if (data.type === 'turn_start') {
+                    // Show round separator on first persona of each round
+                    if (data.round && !container.querySelector(`.round-marker[data-round="${data.round}"]`)) {
+                        const marker = document.createElement('div');
+                        marker.className = 'round-marker';
+                        marker.dataset.round = data.round;
+                        marker.innerHTML = `<span>Round ${data.round}</span>`;
+                        container.appendChild(marker);
+                    }
                     currentMsg = createMessage(data.persona);
                     container.appendChild(currentMsg);
                     currentMsg.scrollIntoView({ behavior: 'smooth', block: 'end' });
