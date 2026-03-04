@@ -10,17 +10,32 @@ Impersonate **Heather Cox Richardson** (political historian) and **Nate B Jones*
 # 1. Start everything
 ./scripts/setup.sh up
 
-# 2a. Ingest transcripts — test mode (5 most recent videos per channel)
-./scripts/setup.sh ingest-test
+# 2. Ingest transcripts
+./scripts/setup.sh ingest          # All videos since Aug 2025
+./scripts/setup.sh ingest-test     # Test mode (5 per channel)
 
-# 2b. Ingest transcripts — full (all videos since Aug 2025 cutoff)
-./scripts/setup.sh ingest
+# 3. Open the Web UI
+open http://localhost:28000        # Debate, Chat, or Monitor modes
 
-# 3. Query via API
-curl -X POST http://localhost:28000/query \
+# 4. Or use the TUI
+python scripts/tui.py              # Terminal conversation interface
+
+# 5. Or query the API directly
+curl -X POST http://localhost:28000/chat \
   -H "Content-Type: application/json" \
-  -d '{"question": "What is happening with AI?", "persona": "nate_b_jones"}'
+  -d '{"question": "What is happening with AI?", "persona": "nate_b_jones", "stream": false}'
 ```
+
+## Conversation Pipeline
+
+When you submit a question in the Debate or Chat views, it goes through the full pipeline:
+
+1. **Embed** your question with `nomic-embed-text` via Ollama
+2. **Retrieve** relevant transcript chunks from pgvector
+3. **Generate** the response via `mistral-large:123b` through Ollama (Metal GPU)
+4. **Stream** tokens back to the browser via SSE
+
+The default LLM model is set in `ConversationEngine.__init__` → `llm_model="mistral-large:123b"`. The 123B Mistral on Metal GPU powers every conversation.
 
 ## Flow diagram
 
@@ -59,12 +74,14 @@ graph TD
         MXBAI --> LANCE
     end
 
-    subgraph "5. Query (at runtime)"
+    subgraph "5. Query & Generate (at runtime)"
         Q["User Question"]
         EMB_Q["Embed question<br/>(same model)"]
         SEARCH["Cosine similarity<br/>search top-K"]
         PROMPT["Build persona prompt<br/>+ retrieved excerpts"]
-        Q --> EMB_Q --> SEARCH --> PROMPT
+        LLM["Mistral-large:123b<br/>via Ollama (Metal GPU)"]
+        STREAM["Stream response<br/>via SSE"]
+        Q --> EMB_Q --> SEARCH --> PROMPT --> LLM --> STREAM
         PG -.-> SEARCH
         LANCE -.-> SEARCH
     end
@@ -72,6 +89,7 @@ graph TD
     style OLLAMA fill:#2d5a27,color:#fff
     style PG fill:#336791,color:#fff
     style LANCE fill:#8b4513,color:#fff
+    style LLM fill:#7c3aed,color:#fff
 ```
 
 
@@ -104,7 +122,8 @@ A fully local, Docker-based **Retrieval-Augmented Generation (RAG)** system for 
 | `src/vectorstores/` | `base.py`, `pgvector_store.py`, `lancedb_store.py` | Strategy + Factory |
 | `src/ingest/` | `downloader.py`, `processor.py`, `pipeline.py` | Pipeline orchestrator |
 | `src/retrieval/` | `retriever.py`, `context_builder.py` | Query + prompt builder |
-| `src/api/` | `server.py` | FastAPI REST endpoints |
+| `src/conversation/` | `engine.py` | RAG → Mistral streaming orchestrator |
+| `src/api/` | `server.py`, `static/` | FastAPI + Web UI (Debate/Chat/Monitor) |
 
 ### Tests
 - `test_config.py` — Settings loading, persona loading, embedding dimensions
